@@ -9,36 +9,7 @@ class PositionType(Enum):
 
 
 class TradingEnvironment:
-    """
-    A simulation of a trading environment..
-
-    This class models the behavior of a trading environment, allowing an agent to
-    perform actions such as opening new positions, buying more shares, selling shares, or holding.
-
-    Attributes:
-    - data (pandas.DataFrame): Historical price data [Timestamp, Open, High, Low, Close, Volume].
-    - initial_balance (float): Initial balance for the portfolio.
-
-    Methods:
-    - reset(): Reset the trading environment to its initial state.
-    - step(action, volume): Perform a trading step based on the given action and volume.
-    - get_action_position_outcome(action_position): Get the corresponding outcome function for a given action and position type.
-    - open_new_position(action, volume, current_price): Open a new position in the trading environment.
-    - buy_more(action, volume, current_price): Buy more shares for an existing position.
-    - sell(action, volume, current_price): Sell shares in the trading environment.
-    - hold(action, volume, current_price): Hold the current position without any transaction.
-    - update_portfolio_value(current_price): Update the portfolio value based on the current position.
-    - print_status(): Print the current state, open position, balance, and portfolio value.
-    """
-
     def __init__(self, data, initial_balance, transaction_fee):
-        """
-        Initialize the trading environment.
-
-        Parameters:
-        - data (pandas.DataFrame): Historical price data [Timestamp, Open, High, Low, Close, Volume].
-        - initial_balance (float): Initial balance for the portfolio.
-        """
         self.data = data
         self.initial_balance = initial_balance
         self.transaction_fee = transaction_fee
@@ -62,9 +33,6 @@ class TradingEnvironment:
         self.reset()
 
     def reset(self):
-        """
-        Reset the trading environment to its initial state.
-        """
         self.current_step = 0
         self.balance = self.initial_balance
         self.current_state = self.data.iloc[self.current_step, :].values
@@ -75,23 +43,27 @@ class TradingEnvironment:
                          'purchase_price': 0}
 
     def step(self, action, volume):
-        """
-        Perform a trading step based on the given action and volume.
-
-        Parameters:
-        - action (PositionType): Action to perform (LONG, HOLD, SHORT).
-        - volume (float): Volume of shares to transact.
-
-        This method updates the trading environment based on the agent's action.
-        """
+        game_over = False
         # Convert action to PositionType
         action = self.action_mapping.get(action)
-        # TODO: Volume can not be 0
+
+        # Volume can not be 0
+        if volume == 0 and action != PositionType.HOLD:
+            print('Error: Volume cannot be zero for LONG and SHORT.')
+            return game_over, self.balance
+
         # Update current state and portfolio value
         self.current_state = self.data.iloc[self.current_step, :].values
         # open price from the current state
         current_price = self.current_state[1]
         self.portfolio_value = self.update_portfolio_value(current_price)
+
+        # Stop loss check
+        if self.stop_loss_check(current_price) == True:
+            print('Game over: Stop loss triggered.')
+            game_over = True
+            self.portfolio_value = self.update_portfolio_value(current_price)
+            return game_over, self.balance
 
         # Get the function to perform based on action performed by agent and the current position type
         action_position = (action, self.position['position_type'])
@@ -108,36 +80,25 @@ class TradingEnvironment:
         # Do the step
         self.current_step += 1
 
+        return game_over, self.balance
+
     def get_action_position_outcome(self, action_position):
-        """
-        Get the corresponding outcome function for the given action and position type.
-
-        Parameters:
-        - action_position (tuple): Tuple representing (action, position type).
-
-        Returns:
-        - function: Corresponding outcome function.
-        """
         for keys, function in self.action_position_mapping.items():
             if action_position in keys:
                 return function
+        print('Error: Action position outcome not found.')
 
     def open_new_position(self, action, volume, current_price):
-        """
-        Open a new position in the trading environment.
+        # Check if you can afford this much volume and if not, reduce it
+        cost, volume = self.cost_volume_calculator(volume, current_price)
 
-        Parameters:
-        - action (PositionType): Action to perform (LONG, SHORT).
-        - volume (float): Volume of shares to transact.
-        - current_price (float): Current share price.
+        if cost == 0:
+            print('Error: Not enough funds to open position.')
+            return
 
-        This function has side effects:
-        - It updates the balance and position of the trading environment.
-        """
-        # Calculate the total cost of transaction and based on that update the balance
-        cost = volume * current_price
+        # Update the balance
         self.balance -= cost
-        # TODO: Check if you can afford it
+
         # Open a new position
         self.position = {'position_type': action,
                          'owned_volume': volume,
@@ -145,26 +106,18 @@ class TradingEnvironment:
         # Pay transaction fee
         self.pay_transaction_fee()
         print(
-            f"New transaction \nType: {action} | Volume: {volume} | Price: {current_price} | Cost: {cost}")
-        print(f"New position opened. {self.position}")
+            f"Opened new {action.name} position:\nVolume: {volume}\nPurchase Price: {current_price}\nCost: {cost}")
 
     def buy_more(self, action, volume, current_price):
-        """
-        Buy more shares for an existing position.
-
-        Parameters:
-        - action (PositionType): Action to perform (LONG, SHORT).
-        - volume (float): Volume of shares to transact.
-        - current_price (float): Current share price.
-
-        This function has side effects:
-        - It updates the balance and position of the trading environment.
-        """
         position_type, owned_volume, purchase_price = self.position.values()
-        # Calculate the total cost of transaction and based on that update the balance
-        cost = volume * current_price
+
+        # Check if you can afford this much volume and if not, reduce it
+        cost, volume = self.cost_volume_calculator(volume, current_price)
+
+        if cost == 0:
+            print('Error: Not enough funds to buy more.')
+
         self.balance -= cost
-        # TODO: Check if you can afford it
         # Calculate new volume and purchase price and update position
         new_volume = owned_volume + volume
         new_purchase_price = np.average(
@@ -175,21 +128,9 @@ class TradingEnvironment:
         # Pay transaction fee
         self.pay_transaction_fee()
         print(
-            f"New transaction \nType: {action} | Volume: {volume} | Price: {current_price} | Cost: {cost}")
-        print(f"Position updated. {self.position}")
+            f"Bought more {action.name} position:\nAdditional Volume: {volume}\nUpdated Purchase Price: {new_purchase_price}\nCost: {cost}")
 
     def sell(self, action, volume, current_price):
-        """
-        Sell shares in the trading environment.
-
-        Parameters:
-        - action (PositionType): Action to perform (LONG, SHORT).
-        - volume (float): Volume of shares to transact.
-        - current_price (float): Current share price.
-
-        This function has side effects:
-        - It updates the balance and position of the trading environment.
-        """
         position_type, owned_volume, purchase_price = self.position.values()
         # Sell some
         if owned_volume > volume:
@@ -203,7 +144,7 @@ class TradingEnvironment:
             outcome = (purchase_price + profit_per_share) * volume
             # Print status
             print(
-                f'Selling {volume} of Position Type: {position_type} for {current_price}. Transaction profit: {total_profit}')
+                f'Sold {volume} shares of {position_type.name} position for {current_price}.\nTotal Transaction Profit: {total_profit}')
             # Update the balance
             self.balance += outcome
             # Calculate how much volume has left
@@ -220,8 +161,8 @@ class TradingEnvironment:
             self.balance += self.portfolio_value
             # Print status
             print(
-                f'Selling {volume} of Position Type {position_type} for {current_price}. Transaction profit: {total_profit}')
-            print(f'Position closed')
+                f'Sold {volume} shares of {position_type.name} position for {current_price}.\nTotal Transaction Profit: {total_profit}')
+            print('Position closed')
             # Zero the position
             self.position = {'position_type': PositionType.HOLD,
                              'owned_volume': 0,
@@ -235,29 +176,12 @@ class TradingEnvironment:
         self.pay_transaction_fee()
 
     def hold(self, action, volume, current_price):
-        print('Hold')
-        pass
+        print('Holding position.')
 
     def pay_transaction_fee(self):
-        """
-        Pay the transaction fee.
-
-        This function has side effects:
-        - It updates the balance by substracting fee from it.
-        """
         self.balance -= self.transaction_fee
-        print(f'Transaction fee has been paid. Amount: {self.transaction_fee}')
 
     def update_portfolio_value(self, current_price):
-        """
-        Update the portfolio value based on the current position.
-
-        Parameters:
-        - current_price (float): Current share price.
-
-        Returns:
-        - float: Updated portfolio value.
-        """
         position_type, owned_volume, purchase_price = self.position.values()
         if position_type == PositionType.LONG:
             # Earn when current_price goes up
@@ -272,8 +196,31 @@ class TradingEnvironment:
             new_portfolio_value = 0
         return new_portfolio_value
 
+    def stop_loss_check(self, current_price):
+        if self.portfolio_value + self.balance < 0:
+            print('Stop loss triggered. Selling position.')
+            # Sell everything
+            position_type, owned_volume, purchase_price = self.position.values()
+            opposite_action = PositionType.SHORT if position_type == PositionType.LONG else PositionType.LONG
+            self.sell(action=opposite_action,
+                      volume=owned_volume,
+                      current_price=current_price)
+            return True
+
+    def cost_volume_calculator(self, volume, current_price):
+        # Check if you can buy all volume
+        if self.balance >= volume * current_price + self.transaction_fee:
+            return volume * current_price, volume
+        # Buy as much as you can
+        else:
+            print('Warning: Not enough funds to buy desired volume. Adjusting volume.')
+            new_volume = (self.balance - self.transaction_fee) // current_price
+            return new_volume * current_price, new_volume
+
     def print_status(self):
-        print(f'Current state: {self.current_state}')
-        print(f'Open position: {self.position}')
-        print(f'Balance: {self.balance}')
-        print(f'Portfolio value: {self.portfolio_value}')
+        print("Current Status:")
+        print(f"  Current State: {self.current_state}")
+        print(f"  Open Position: {self.position}")
+        print(f"  Balance: {self.balance}")
+        print(f"  Portfolio Value: {self.portfolio_value}")
+        print()

@@ -31,7 +31,7 @@ class TradingEnvironment:
     - print_status(): Print the current state, open position, balance, and portfolio value.
     """
 
-    def __init__(self, data, initial_balance):
+    def __init__(self, data, initial_balance, transaction_fee):
         """
         Initialize the trading environment.
 
@@ -41,6 +41,7 @@ class TradingEnvironment:
         """
         self.data = data
         self.initial_balance = initial_balance
+        self.transaction_fee = transaction_fee
 
         # Agent uses actions [1, 0, -1] so they have to be translated
         self.action_mapping = {
@@ -141,9 +142,11 @@ class TradingEnvironment:
         self.position = {'position_type': action,
                          'owned_volume': volume,
                          'purchase_price': current_price}
-        print(f"New position opened. {self.position}")
+        # Pay transaction fee
+        self.pay_transaction_fee()
         print(
-            f"Transaction Type: {action} | Volume: {volume} | Price: {current_price} | Cost: {cost}")
+            f"New transaction \nType: {action} | Volume: {volume} | Price: {current_price} | Cost: {cost}")
+        print(f"New position opened. {self.position}")
 
     def buy_more(self, action, volume, current_price):
         """
@@ -169,9 +172,11 @@ class TradingEnvironment:
         self.position = {'position_type': position_type,
                          'owned_volume': new_volume,
                          'purchase_price': new_purchase_price}
-        print(f"Position updated. {self.position}")
+        # Pay transaction fee
+        self.pay_transaction_fee()
         print(
-            f"Transaction Type: {action} | Volume: {volume} | Price: {current_price} | Cost: {cost}")
+            f"New transaction \nType: {action} | Volume: {volume} | Price: {current_price} | Cost: {cost}")
+        print(f"Position updated. {self.position}")
 
     def sell(self, action, volume, current_price):
         """
@@ -226,10 +231,21 @@ class TradingEnvironment:
                 self.open_new_position(action=action,
                                        volume=remaining_volume,
                                        current_price=current_price)
+        # Pay transaction fee
+        self.pay_transaction_fee()
 
     def hold(self, action, volume, current_price):
         print('Hold')
         pass
+
+    def pay_transaction_fee(self):
+        """
+        Pay the transaction fee.
+
+        This function has side effects:
+        - It updates the balance by substracting fee from it.
+        """
+        self.balance -= self.transaction_fee
 
     def update_portfolio_value(self, current_price):
         """

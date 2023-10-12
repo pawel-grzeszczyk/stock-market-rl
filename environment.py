@@ -246,6 +246,7 @@ class TradingEnvironment:
         - It updates the balance by substracting fee from it.
         """
         self.balance -= self.transaction_fee
+        print(f'Transaction fee has been paid. Amount: {self.transaction_fee}')
 
     def update_portfolio_value(self, current_price):
         """

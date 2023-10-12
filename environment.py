@@ -42,6 +42,13 @@ class TradingEnvironment:
         self.data = data
         self.initial_balance = initial_balance
 
+        # Agent uses actions [1, 0, -1] so they have to be translated
+        self.action_mapping = {
+            1: PositionType.LONG,
+            0: PositionType.HOLD,
+            -1: PositionType.SHORT
+        }
+
         # (agent action, type of open position) -> function
         # functions open_new_position, buy_more, sell ore not pure as they update position and balance
         self.action_position_mapping = {
@@ -62,7 +69,7 @@ class TradingEnvironment:
         self.current_state = self.data.iloc[self.current_step, :].values
 
         self.portfolio_value = 0
-        self.position = {'position_type': 0,
+        self.position = {'position_type': PositionType.HOLD,
                          'owned_volume': 0,
                          'purchase_price': 0}
 
@@ -76,6 +83,8 @@ class TradingEnvironment:
 
         This method updates the trading environment based on the agent's action.
         """
+        # Convert action to PositionType
+        action = self.action_mapping.get(action)
         # TODO: Volume can not be 0
         # Update current state and portfolio value
         self.current_state = self.data.iloc[self.current_step, :].values
@@ -209,7 +218,7 @@ class TradingEnvironment:
                 f'Selling {volume} of Position Type {position_type} for {current_price}. Transaction profit: {total_profit}')
             print(f'Position closed')
             # Zero the position
-            self.position = {'position_type': 0,
+            self.position = {'position_type': PositionType.HOLD,
                              'owned_volume': 0,
                              'purchase_price': 0}
             # Open reverse if there is some remaining volume

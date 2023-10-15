@@ -59,7 +59,7 @@ class TradingEnvironment:
         self.portfolio_value = self.update_portfolio_value(current_price)
 
         # Stop loss check
-        if self.stop_loss_check(current_price) == True:
+        if self.stop_loss(current_price) == True:
             print('Game over: Stop loss triggered.')
             game_over = True
             self.portfolio_value = self.update_portfolio_value(current_price)
@@ -116,6 +116,7 @@ class TradingEnvironment:
 
         if cost == 0:
             print('Error: Not enough funds to buy more.')
+            return
 
         self.balance -= cost
         # Calculate new volume and purchase price and update position
@@ -144,7 +145,7 @@ class TradingEnvironment:
             outcome = (purchase_price + profit_per_share) * volume
             # Print status
             print(
-                f'Sold {volume} shares of {position_type.name} position for {current_price}.\nTotal Transaction Profit: {total_profit}')
+                f'Sold {owned_volume} shares of {position_type.name} position for {current_price}.\nTotal Transaction Profit: {total_profit}')
             # Update the balance
             self.balance += outcome
             # Calculate how much volume has left
@@ -196,9 +197,11 @@ class TradingEnvironment:
             new_portfolio_value = 0
         return new_portfolio_value
 
-    def stop_loss_check(self, current_price):
-        if self.portfolio_value + self.balance < 0:
+    def stop_loss(self, current_price):
+        if (self.portfolio_value + self.balance <= 0) or (self.balance <= 0):
             print('Stop loss triggered. Selling position.')
+            print(
+                f'Portfolio value: {self.portfolio_value} | Balance: {self.balance}')
             # Sell everything
             position_type, owned_volume, purchase_price = self.position.values()
             opposite_action = PositionType.SHORT if position_type == PositionType.LONG else PositionType.LONG
@@ -214,7 +217,9 @@ class TradingEnvironment:
         # Buy as much as you can
         else:
             print('Warning: Not enough funds to buy desired volume. Adjusting volume.')
-            new_volume = (self.balance - self.transaction_fee) // current_price
+            # TODO: !!! rounding by hand
+            new_volume = np.floor(
+                ((self.balance - self.transaction_fee) / current_price))
             return new_volume * current_price, new_volume
 
     def print_status(self):

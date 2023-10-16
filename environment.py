@@ -49,7 +49,7 @@ class TradingEnvironment:
 
         # Volume can not be 0
         if volume == 0 and action != PositionType.HOLD:
-            print('Error: Volume cannot be zero for LONG and SHORT.')
+            # print('Error: Volume cannot be zero for LONG and SHORT.') # TODO
             self.action = PositionType.HOLD
             return game_over, self.balance, self.action
 
@@ -94,7 +94,7 @@ class TradingEnvironment:
         cost, volume = self.cost_volume_calculator(volume, current_price)
 
         if cost == 0:
-            print('Error: Not enough funds to open position.')
+            # print('Error: Not enough funds to open position.') # TODO
             self.action = PositionType.HOLD
             return
 
@@ -117,7 +117,7 @@ class TradingEnvironment:
         cost, volume = self.cost_volume_calculator(volume, current_price)
 
         if cost == 0:
-            print('Error: Not enough funds to buy more.')
+            # print('Error: Not enough funds to buy more.') # TODO
             self.action = PositionType.HOLD
             return
 
@@ -180,7 +180,7 @@ class TradingEnvironment:
         self.pay_transaction_fee()
 
     def hold(self, action, volume, current_price):
-        print('Holding position.')
+        pass
 
     def pay_transaction_fee(self):
         self.balance -= self.transaction_fee
@@ -222,7 +222,7 @@ class TradingEnvironment:
             return volume * current_price, volume
         # Buy as much as you can
         else:
-            print('Warning: Not enough funds to buy desired volume. Adjusting volume.')
+            # print('Warning: Not enough funds to buy desired volume. Adjusting volume.') # TODO
             # TODO: Set the parameter for it
             new_volume = np.floor(
                 ((self.balance - self.transaction_fee) / current_price))

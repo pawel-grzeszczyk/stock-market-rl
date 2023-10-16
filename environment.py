@@ -62,8 +62,20 @@ class TradingEnvironment:
         # Stop loss check
         if self.stop_loss(current_price) == True:
             print('Game over: Stop loss triggered.')
-            game_over = True
             self.portfolio_value = self.update_portfolio_value(current_price)
+            game_over = True
+            return game_over, self.balance, self.action
+
+        # Check if the current step should be the last one
+        if self.current_step == (len(self.data) - 1):
+            # Sell everything
+            print('Last iteration. Selling owned position.')
+            self.end_game(current_price)
+            self.portfolio_value = self.update_portfolio_value(current_price)
+            game_over = True
+            print('\nRun Finished.')
+            print(
+                f'Balance: {self.balance}')
             return game_over, self.balance, self.action
 
         # Get the function to perform based on action performed by agent and the current position type
@@ -206,12 +218,7 @@ class TradingEnvironment:
             print(
                 f'Portfolio value: {self.portfolio_value} | Balance: {self.balance}')
             # Sell everything
-            position_type, owned_volume, purchase_price = self.position.values()
-            opposite_action = PositionType.SHORT if position_type == PositionType.LONG else PositionType.LONG
-            self.action = opposite_action
-            self.sell(action=opposite_action,
-                      volume=owned_volume,
-                      current_price=current_price)
+            self.end_game(current_price)
             return True
         else:
             return False
@@ -227,6 +234,18 @@ class TradingEnvironment:
             new_volume = np.floor(
                 ((self.balance - self.transaction_fee) / current_price))
             return new_volume * current_price, new_volume
+
+    def end_game(self, current_price):
+        position_type, owned_volume, purchase_price = self.position.values()
+        # If you own nothing, do nothing
+        if position_type == PositionType.HOLD:
+            return
+        # If you have anything, sell it all
+        opposite_action = PositionType.SHORT if position_type == PositionType.LONG else PositionType.LONG
+        self.action = opposite_action
+        self.sell(action=opposite_action,
+                  volume=owned_volume,
+                  current_price=current_price)
 
     def print_status(self):
         print("Current Status:")

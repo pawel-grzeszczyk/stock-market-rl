@@ -45,12 +45,13 @@ class TradingEnvironment:
     def step(self, action, volume):
         game_over = False
         # Convert action to PositionType
-        action = self.action_mapping.get(action)
+        self.action = self.action_mapping.get(action)
 
         # Volume can not be 0
         if volume == 0 and action != PositionType.HOLD:
             print('Error: Volume cannot be zero for LONG and SHORT.')
-            return game_over, self.balance
+            self.action = PositionType.HOLD
+            return game_over, self.balance, self.action
 
         # Update current state and portfolio value
         self.current_state = self.data.iloc[self.current_step, :].values
@@ -63,14 +64,14 @@ class TradingEnvironment:
             print('Game over: Stop loss triggered.')
             game_over = True
             self.portfolio_value = self.update_portfolio_value(current_price)
-            return game_over, self.balance
+            return game_over, self.balance, self.action
 
         # Get the function to perform based on action performed by agent and the current position type
-        action_position = (action, self.position['position_type'])
+        action_position = (self.action, self.position['position_type'])
         outcome_function = self.get_action_position_outcome(action_position)
 
         # Update position and balance
-        outcome_function(action=action,
+        outcome_function(action=self.action,
                          volume=volume,
                          current_price=current_price)
 
@@ -80,7 +81,7 @@ class TradingEnvironment:
         # Do the step
         self.current_step += 1
 
-        return game_over, self.balance
+        return game_over, self.balance, self.action
 
     def get_action_position_outcome(self, action_position):
         for keys, function in self.action_position_mapping.items():
@@ -94,6 +95,7 @@ class TradingEnvironment:
 
         if cost == 0:
             print('Error: Not enough funds to open position.')
+            self.action = PositionType.HOLD
             return
 
         # Update the balance
@@ -116,6 +118,7 @@ class TradingEnvironment:
 
         if cost == 0:
             print('Error: Not enough funds to buy more.')
+            self.action = PositionType.HOLD
             return
 
         self.balance -= cost
@@ -205,10 +208,13 @@ class TradingEnvironment:
             # Sell everything
             position_type, owned_volume, purchase_price = self.position.values()
             opposite_action = PositionType.SHORT if position_type == PositionType.LONG else PositionType.LONG
+            self.action = opposite_action
             self.sell(action=opposite_action,
                       volume=owned_volume,
                       current_price=current_price)
             return True
+        else:
+            return False
 
     def cost_volume_calculator(self, volume, current_price):
         # Check if you can buy all volume
@@ -217,7 +223,7 @@ class TradingEnvironment:
         # Buy as much as you can
         else:
             print('Warning: Not enough funds to buy desired volume. Adjusting volume.')
-            # TODO: !!! rounding by hand
+            # TODO: Set the parameter for it
             new_volume = np.floor(
                 ((self.balance - self.transaction_fee) / current_price))
             return new_volume * current_price, new_volume

@@ -6,7 +6,7 @@ from secret import KEY, SECRET
 
 def get_and_preprocess_data(binance_client: Client,
                             start: str,
-                            end: str = datetime.today().strftime('%d %b %Y'),
+                            end: str = datetime.today().strftime('%Y-%m-%d'),
                             symbol: str = 'BTCUSDT',
                             interval: str = Client.KLINE_INTERVAL_1DAY,
                             save: bool = True,
@@ -16,6 +16,21 @@ def get_and_preprocess_data(binance_client: Client,
     dir = Path(dir)
     filename = f'{symbol}_{interval}_data.csv'
     path = dir / filename
+
+    # Check if file already exists
+    if path.exists():
+        print('File already exists.')
+        data = pd.read_csv(path)
+        # Check if timeframe match
+        if (data['Timestamp'].iloc[0] == start) and (data['Timestamp'].iloc[-1] == end):
+            print('Timeframe ok. \nReturning already existing file.')
+            # Return already existing file
+            return data
+        # Download new file
+        else:
+            print('Timeframe does not match.')
+
+    print('Downloading data...')
 
     # Binance Key and Secret
     client = binance_client

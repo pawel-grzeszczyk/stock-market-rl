@@ -48,8 +48,8 @@ class TradingEnvironment:
         self.action = self.action_mapping.get(action)
 
         # Volume can not be 0
-        if volume == 0 and action != PositionType.HOLD:
-            # print('Error: Volume cannot be zero for LONG and SHORT.') # TODO
+        if ((volume == 0) and (self.action != PositionType.HOLD)):
+            print('Error: Volume cannot be zero for LONG and SHORT.')  # TODO
             self.action = PositionType.HOLD
             return game_over, self.balance, self.action
 
